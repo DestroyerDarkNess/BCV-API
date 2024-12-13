@@ -1,14 +1,19 @@
-import asyncio
+import aiohttp
 from typing import Dict, Optional
 from bs4 import BeautifulSoup
-import requests
 
 class MoneyData:
     def __init__(self):
         self.ID = ""
         self.Icon = ""
         self.Value = ""
-
+        
+class NetworkResult:
+    def __init__(self):
+        self.HTMLSource = None
+        self.IsSuccessStatusCode = False
+        self.StatusCode = None
+        
 class BCV:
     def __init__(self):
         self.Base = "https://www.bcv.org.ve/"
@@ -17,27 +22,36 @@ class BCV:
     async def get_data(self) -> Optional[Dict[str, MoneyData]]:
         result = None
         response = await self.get_web_page(self.Base)
-
-        if response is None:
+        
+        if response is None or not response.IsSuccessStatusCode:
             return result
 
-        if response.status_code == 200:
-            result = {}
+        result = {}
+        document = BeautifulSoup(response.HTMLSource, 'html.parser')
 
-            document = BeautifulSoup(response.text, 'html.parser')
-
-            for money_id in self.MoneyIDList:
-                money_element = document.find(id=money_id)
-                if money_element is not None:
-                    money_data = self.get_money_data(money_element)
-                    if money_data is not None:
-                        result[money_id] = money_data
+        for money_id in self.MoneyIDList:
+            money_element = document.find(id=money_id)
+            if money_element is not None:
+                money_data = self.get_money_data(money_element)
+                if money_data is not None:
+                    result[money_id] = money_data
 
         return result
 
-    async def get_web_page(self, url: str):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, requests.get, url)
+    async def get_web_page(self, url_target: str) -> NetworkResult:
+        try:
+            result = NetworkResult()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url_target, ssl=False) as response:
+                    if response.status == 200:
+                        content = await response.text()
+                        result.HTMLSource = content
+                        result.IsSuccessStatusCode = True
+                    else:
+                        result.StatusCode = response.status
+            return result
+        except Exception as e:
+            return None
 
     def get_money_data(self, parent_element) -> Optional[MoneyData]:
         try:
