@@ -1,12 +1,14 @@
 import aiohttp
 from typing import Dict, Optional
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 class MoneyData:
     def __init__(self):
         self.ID = ""
         self.Icon = ""
         self.Value = ""
+        self.Date = None
         
 class NetworkResult:
     def __init__(self):
@@ -59,14 +61,25 @@ class BCV:
             id_ = row.find("span").text
             img_url = self.Base + row.find("img")["src"]
             value = row.find("strong").text
-
+            date = None
+            
+            try:
+                date_element = parent_element.find_parent(class_="view-content").find("span", class_="date-display-single")
+                if date_element is not None:
+                    date_content = date_element["content"]
+                    date = datetime.fromisoformat(date_content)
+            except Exception as ex:
+                date = None
+            
             money_data = MoneyData()
             money_data.ID = id_
             money_data.Icon = img_url
             money_data.Value = value
+            money_data.Date = date
 
             return money_data
 
-        except Exception:
+        except Exception as e:
             return None
+     
 
